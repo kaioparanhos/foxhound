@@ -40,6 +40,10 @@ type Result struct {
 	Status    string 	`json:"status"`
 	Servico   string 	`json:"servico,omitempty"`
 	Mensagem  string 	`json:"mensagem,omitempty"`
+	Porta     int       `json:"porta"`
+	Status    string    `json:"status"`
+	Servico   string    `json:"servico,omitempty"`
+	Mensagem  string    `json:"mensagem,omitempty"`
 
 }
 
@@ -82,3 +86,4 @@ func main() {
     saveReport(report, config)
 
 }
+ 
