@@ -16,7 +16,7 @@ import (
 
 	// lib
 	"github.com/likexian/whois"
-    	"github.com/tealeg/xlsx"
+  "github.com/tealeg/xlsx"
 )
 
 type Config struct {
@@ -30,7 +30,7 @@ type Config struct {
 	Format     string   `json:"format"`
 	Rapido     bool     `json:"rapido"`
 	Dir        string   `json:"dir"`
-    	Delay      int      `json:"delay"`
+  Delay      int      `json:"delay"`
 	
 }
 
