@@ -16,7 +16,7 @@ import (
 
 	// lib
 	"github.com/likexian/whois"
-  "github.com/tealeg/xlsx"
+    "github.com/tealeg/xlsx"
 )
 
 type Config struct {
@@ -30,11 +30,11 @@ type Config struct {
 	Format     string   `json:"format"`
 	Rapido     bool     `json:"rapido"`
 	Dir        string   `json:"dir"`
-  Delay      int      `json:"delay"`
+    Delay      int      `json:"delay"`
 	
 }
 
-type Result struct {
+type Resultado struct {
 
 	IP        string    `json:"ip"`
 	Porta     int       `json:"porta"`
@@ -44,7 +44,7 @@ type Result struct {
 
 }
 
-var services = map [int] string {
+var servicos = map [int] string {
 
     22:  	"SSH",
     80:  	"HTTP",
@@ -54,7 +54,7 @@ var services = map [int] string {
 
 }
 
-var cports = [] int {22, 80, 443, 21, 25, 53, 110, 143, 3306, 3389}
+var portas_comuns = [] int {22, 80, 443, 21, 25, 53, 110, 143, 3306, 3389}
 
 func main() {
 
@@ -72,15 +72,15 @@ func main() {
 
     }
 
-    var report []Result
+    var relatorio []Resultado
     for _, ip := range config.IPs {
 
-        finds := IPscanner(ip, config)
-        report = append(report, finds...)
+        resultados := scanIP(ip, config)
+        relatorio = append(relatorio, resultados...)
 
     }
 
-    saveReport(report, config)
+    saveReport(relatorio, config)
 
 }
 
@@ -171,7 +171,53 @@ func UserInput() Config {
         Delay:      delay,
 
     }
+    
 }
 
+func scanIP(ip string, config Config) []Resultado {
 
- 
+    portas := make(chan int, config.Workers)
+    resultados := make(chan Resultado, config.Fim-config.Inicio+1)
+    var wg sync.WaitGroup
+
+    for i := 0; i < config.Workers; i++ {
+        wg.Add(1)
+        go worker(ip, portas, resultados, &wg, time.Duration(config.Timeout)*time.Second, time.Duration(config.Delay))
+    }
+
+    go func() {
+        if config.Rapido {
+            for _, porta := range portas_comuns {
+                portas <- porta
+            }
+        } else {
+            for porta := config.Inicio; porta <= config.Fim; porta++ {
+                portas <- porta
+            }
+        }
+
+        close(portas)
+    }()
+
+    var relatorio []Resultado
+    go func() {
+        wg.Wait()
+        close(resultados)
+    }()
+
+    for resultado := range resultados {
+        relatorio = append(relatorio, resultado)
+    }
+
+    for i := range relatorio {
+
+        if relatorio[i].Status == "ABERTA" {
+            relatorio[i].Mensagem = consultarWHOIS(ip)
+        }
+
+    }
+
+    return relatorio
+
+}
+
