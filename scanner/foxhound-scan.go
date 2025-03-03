@@ -221,3 +221,32 @@ func scanIP(ip string, config Config) []Resultado {
 
 }
 
+func worker(ip string, portas <-chan int, resultados chan<- Resultado, wg *sync.WaitGroup, timeout time.Duration, delay time.Duration) {
+    defer wg.Done()
+
+    for porta := range portas {
+        resultados <- verificarPorta(ip, porta, timeout, delay)
+    }
+}
+
+func verificarPorta(ip string, porta int, timeout time.Duration, delay time.Duration) Resultado {
+
+    if delay > 0 {
+        time.Sleep(delay * time.Millisecond) // Atraso entre conexões
+    }
+
+    target := fmt.Sprintf("%s:%d", ip, porta)
+    conn, err := net.DialTimeout("tcp", target, timeout)
+    if err != nil {
+        return Resultado{IP: ip, Porta: porta, Status: "FECHADA", Mensagem: err.Error()}
+    }
+    defer conn.Close()
+
+    servico := servicos[porta]
+    
+    if servico == "" {
+        servico = "Desconhecido"
+    }
+
+    return Resultado{IP: ip, Porta: porta, Status: "ABERTA", Servico: servico}
+}
