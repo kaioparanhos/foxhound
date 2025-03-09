@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"go/scanner"
 	"log"
 	"net"
 	"os"
@@ -80,7 +79,7 @@ func main() {
 
     }
 
-    saveReport(relatorio, config)
+    salvarRelatorio(relatorio, config)
 
 }
 
@@ -243,10 +242,116 @@ func verificarPorta(ip string, porta int, timeout time.Duration, delay time.Dura
     defer conn.Close()
 
     servico := servicos[porta]
-    
+
     if servico == "" {
         servico = "Desconhecido"
     }
 
     return Resultado{IP: ip, Porta: porta, Status: "ABERTA", Servico: servico}
+}
+
+func consultarWHOIS(ip string) string {
+    result, err := whois.Whois(ip)
+    if err != nil {
+        return fmt.Sprintf("Erro ao consultar WHOIS: %v", err)
+    }
+    return fmt.Sprintf("WHOIS Info:\n%s", result)
+}
+
+func salvarRelatorio(relatorio []Resultado, config Config) {
+    switch config.Format {
+    case "json":
+        salvarRelatorioJSON(relatorio, config)
+    case "csv":
+        salvarRelatorioCSV(relatorio, config)
+    case "txt":
+        salvarRelatorioTXT(relatorio, config)
+    case "xlsx":
+        salvarRelatorioODS(relatorio, config)
+    default:
+        log.Fatalf("Formato de relatório inválido: %s", config.Format)
+    }
+}
+
+
+func salvarRelatorioJSON(relatorio []Resultado, config Config) {
+    timestamp := time.Now().Format("02-01-2006-15-04-05")
+    arquivoNome := fmt.Sprintf("%s/%s-%s.json", config.Dir, config.Output, timestamp)
+
+    arquivo, _ := json.MarshalIndent(relatorio, "", "  ")
+    os.WriteFile(arquivoNome, arquivo, 0644)
+
+    log.Printf("Relatório salvo em %s!", arquivoNome)
+}
+
+
+func salvarRelatorioCSV(relatorio []Resultado, config Config) {
+    timestamp := time.Now().Format("02-01-2006-15-04-05")
+    arquivoNome := fmt.Sprintf("%s/%s-%s.csv", config.Dir, config.Output, timestamp)
+
+    arquivo, _ := os.Create(arquivoNome)
+    defer arquivo.Close()
+    writer := csv.NewWriter(arquivo)
+    writer.Write([]string{"IP", "Porta", "Status", "Servico", "Mensagem"})
+    for _, r := range relatorio {
+        writer.Write([]string{r.IP, fmt.Sprint(r.Porta), r.Status, r.Servico, r.Mensagem})
+    }
+    writer.Flush()
+
+    log.Printf("Relatório salvo em %s!", arquivoNome)
+}
+
+
+func salvarRelatorioTXT(relatorio []Resultado, config Config) {
+    timestamp := time.Now().Format("02-01-2006-15-04-05")
+    arquivoNome := fmt.Sprintf("%s/%s-%s.txt", config.Dir, config.Output, timestamp)
+
+    arquivo, _ := os.Create(arquivoNome)
+    defer arquivo.Close()
+    for _, r := range relatorio {
+        arquivo.WriteString(fmt.Sprintf("IP: %s, Porta: %d, Status: %s, Servico: %s, Mensagem: %s\n", r.IP, r.Porta, r.Status, r.Servico, r.Mensagem))
+    }
+
+    log.Printf("Relatório salvo em %s!", arquivoNome)
+}
+
+
+func salvarRelatorioODS(relatorio []Resultado, config Config) {
+    timestamp := time.Now().Format("02-01-2006-15-04-05")
+    arquivoNome := fmt.Sprintf("%s/%s-%s.xlsx", config.Dir, config.Output, timestamp)
+
+    file := xlsx.NewFile()
+    sheet, err := file.AddSheet("Relatório")
+    if err != nil {
+        log.Fatalf("Erro ao criar planilha: %v", err)
+    }
+
+    
+    row := sheet.AddRow()
+    row.AddCell().SetString("IP")
+    row.AddCell().SetString("Porta")
+    row.AddCell().SetString("Status")
+    row.AddCell().SetString("Serviço")
+    row.AddCell().SetString("Mensagem")
+
+    
+    for _, r := range relatorio {
+        row := sheet.AddRow()
+        row.AddCell().SetString(r.IP)
+        row.AddCell().SetInt(r.Porta)
+        row.AddCell().SetString(r.Status)
+        row.AddCell().SetString(r.Servico)
+        row.AddCell().SetString(r.Mensagem)
+    }
+
+    if err := file.Save(arquivoNome); err != nil {
+        log.Fatalf("Erro ao salvar arquivo .xlsx: %v", err)
+    }
+
+    log.Printf("Relatório salvo em %s!", arquivoNome)
+}
+
+
+func parseIPs(ips string) []string {
+    return strings.Split(ips, ",")
 }
